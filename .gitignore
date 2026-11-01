@@ -1,0 +1,18 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Output and test audio files
+output/
+test_out/
+separated/
+*.mp3
+*.wav
+*.flac
