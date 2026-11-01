@@ -6,6 +6,40 @@ A **100% local, offline-capable** open-source CLI tool that analyzes MP3/audio t
 
 ---
 
+## Installation on Any Device
+
+Clone the repository and run the included installer script for your OS. It automatically checks/installs `uv` and `ffmpeg`, sets up the Python 3.11 environment, registers `stems` on your `PATH`, and caches the local Demucs v4 neural network weights (`htdemucs` 4-stem and `htdemucs_6s` 6-stem) into `./models/` for offline use.
+
+### Windows (PowerShell or Command Prompt)
+
+```powershell
+git clone https://github.com/dario-cruz/stem-splitter.git
+cd stem-splitter
+
+# Global install (Default — makes 'stems' available from any folder)
+.\install.ps1
+
+# Or Local-only install (installs inside .venv only)
+.\install.ps1 -Mode local
+```
+*(You can also simply double-click **`install.bat`** in File Explorer!)*
+
+### Linux / macOS / WSL
+
+```bash
+git clone https://github.com/dario-cruz/stem-splitter.git
+cd stem-splitter
+chmod +x install.sh
+
+# Global install (Default)
+./install.sh
+
+# Or Local-only install (.venv only)
+./install.sh --local
+```
+
+---
+
 ## Quick Usage (`stems`)
 
 Both `stems` (short command) and `stem-splitter` are installed and can be used interchangeably from any folder:
@@ -40,15 +74,11 @@ stems .\my_tracks -o .\stems_out
 
 ## Local Model Weights (`./models`)
 
-Neural network weight files live directly in `C:\Users\Dario\repos\stem-splitter\models\`:
+Neural network weight files live directly in `./models/` (or `~/.stem-splitter/models` if installed outside a repo checkout):
 - `htdemucs.yaml` + `955717e8.safetensors` (~80 MB — Default 4-stem model)
-- `htdemucs_6s.yaml` + `5c90dfd2.safetensors` (~80 MB — 6-stem model adding Guitar & Piano)
+- `htdemucs_6s.yaml` + `5c90dfd2.safetensors` (~52 MB — 6-stem model adding Guitar & Piano)
 
-When `stems` runs, `LocalSeparator` loads `.safetensors` directly from `./models/` with zero HTTP requests. If you ever want to pre-cache all optional models (`htdemucs_ft`) into `./models/` for offline use, run:
-
-```powershell
-stems --download-models
-```
+When `stems` runs, `LocalSeparator` loads `.safetensors` directly from `./models/` with zero HTTP requests.
 
 ---
 

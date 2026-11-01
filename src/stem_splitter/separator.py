@@ -23,8 +23,13 @@ os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 warnings.filterwarnings("ignore", category=UserWarning, module="huggingface_hub")
 
-# Local models folder inside the repository (100% offline execution once populated)
-MODELS_DIR = Path(__file__).resolve().parents[2] / "models"
+# Local models folder: use repo ./models if running from source checkout, else ~/.stem-splitter/models
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+MODELS_DIR = (
+    _REPO_ROOT / "models"
+    if (_REPO_ROOT / "pyproject.toml").exists()
+    else Path.home() / ".stem-splitter" / "models"
+)
 
 SUPPORTED_MODELS: dict[str, str] = {
     "htdemucs": "Hybrid Transformer Demucs v4 (4 stems: vocals, drums, bass, other)",

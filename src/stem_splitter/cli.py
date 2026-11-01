@@ -144,7 +144,7 @@ def cli(
       stems                      # Interactive prompt / current folder picker
     """
     if download_models:
-        for m in ("htdemucs", "htdemucs_6s", "htdemucs_ft"):
+        for m in ("htdemucs", "htdemucs_6s"):
             with console.status(f"[bold cyan]Caching local weights for '{m}' into {MODELS_DIR}...[/bold cyan]"):
                 files = ensure_local_model(m)
             console.print(f"[green]✓[/green] {m}: {len(files)} weight file(s) ready in [bold]{MODELS_DIR}[/bold]")
