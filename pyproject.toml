@@ -19,6 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
+stems = "stem_splitter:main"
 stem-splitter = "stem_splitter:main"
 
 [build-system]
