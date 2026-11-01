@@ -1,10 +1,14 @@
 # Stem Splitter (`stems` / `stem-splitter`)
 
-An open-source CLI tool that analyzes MP3/audio tracks (technical metrics, loudness, BPM, and musical key + Camelot notation) and separates them into highest-quality **320 kbps CBR MP3 stems** using **Meta's Demucs v4 (`htdemucs`)** and **LAME (`preset=2`)**.
+A **100% local, offline-capable** open-source CLI tool that analyzes MP3/audio tracks (technical metrics, loudness, BPM, and musical key + Camelot notation) and separates them into highest-quality **320 kbps CBR MP3 stems** using **Meta's Demucs v4 (`htdemucs`)** and **LAME (`preset=2`)**.
+
+> **Privacy & Offline Guarantee:** All audio analysis (`librosa`) and neural network stem separation (`PyTorch` + `Demucs v4`) execute **100% locally on your hardware**. Pre-trained `.safetensors` neural network weights are stored directly inside the local `models/` folder and loaded from disk without contacting any external server or requiring any API tokens.
+
+---
 
 ## Quick Usage (`stems`)
 
-Both `stems` (short command) and `stem-splitter` are installed and can be used interchangeably:
+Both `stems` (short command) and `stem-splitter` are installed and can be used interchangeably from any folder:
 
 ```powershell
 # 1. Split a track into 4 stems (vocals, drums, bass, other) at 320 kbps MP3
@@ -34,19 +38,17 @@ stems .\my_tracks -o .\stems_out
 
 ---
 
-## Features
+## Local Model Weights (`./models`)
 
-- **Comprehensive Pre-Separation Audio Analysis (`librosa` + `mutagen`):**
-  - **Technical & Signal Metrics:** Duration, sample rate, bitrate, channel layout, Peak dBFS, RMS loudness (dBFS), and Crest Factor (dB).
-  - **Musical & DJ Analysis:** Harmonic-Percussive Source Separation (HPSS) for accurate **Tempo (BPM)** tracking and **Musical Key + Camelot Wheel** detection (e.g., `8A` / `A Minor`), ready for Rekordbox, Serato, or Traktor workflows.
-- **State-of-the-Art Open-Source Separation (`Demucs v4`):**
-  - **4-Stem Mode (Default `htdemucs`):** `vocals.mp3`, `drums.mp3`, `bass.mp3`, `other.mp3`
-  - **6-Stem Mode (`-6` / `--six-stems`):** Adds `guitar.mp3` and `piano.mp3`
-  - **Fine-Tuned HQ Mode (`-q` / `--hq`):** Bag of 4 fine-tuned models (`htdemucs_ft`) for maximum Signal-to-Distortion Ratio (SDR)
-  - **2-Stem / Karaoke / Acapella Mode (`-v` or `-s <stem>`):** Outputs `<stem>.mp3` and `no_<stem>.mp3`
-- **Highest-Quality MP3 Output & Automatic ID3 Tagging:**
-  - Encoded directly at **320 kbps CBR** using LAME quality preset `2` (highest quality) with automatic anti-clipping (`rescale`).
-  - Automatically writes ID3v2 tags (`TIT2` Title with stem name, `TPE1` Artist, `TALB` Album, `TBPM` detected BPM, and `TKEY` Camelot Key) into every generated stem MP3.
+Neural network weight files live directly in `C:\Users\Dario\repos\stem-splitter\models\`:
+- `htdemucs.yaml` + `955717e8.safetensors` (~80 MB — Default 4-stem model)
+- `htdemucs_6s.yaml` + `5c90dfd2.safetensors` (~80 MB — 6-stem model adding Guitar & Piano)
+
+When `stems` runs, `LocalSeparator` loads `.safetensors` directly from `./models/` with zero HTTP requests. If you ever want to pre-cache all optional models (`htdemucs_ft`) into `./models/` for offline use, run:
+
+```powershell
+stems --download-models
+```
 
 ---
 
@@ -66,4 +68,5 @@ stems .\my_tracks -o .\stems_out
 | `-b` | `--bitrate <kbps>` | Output MP3 CBR bitrate: `192`, `256`, or `320` (default: `320`). |
 | `-d` | `--device <dev>` | Compute device: `auto`, `cpu`, or `cuda` (default: `auto`). |
 | `-t` | `--threads <num>` | Number of CPU worker threads (`0` = auto). |
+| | `--download-models` | Pre-download local weights for models into `./models` for offline use. |
 | `-h` | `--help` | Show CLI help message. |

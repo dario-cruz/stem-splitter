@@ -1,4 +1,4 @@
-"""Rich CLI interface for Stem Splitter: Audio Analysis & Demucs v4 Stem Separation."""
+"""Rich CLI interface for Stem Splitter: 100% Local Audio Analysis & Demucs v4 Stem Separation."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from rich.prompt import Prompt
 from rich.table import Table
 
 from .analyzer import TrackAnalysis, analyze_audio
-from .separator import SUPPORTED_MODELS, StemOutput, separate_to_stems
+from .separator import MODELS_DIR, SUPPORTED_MODELS, StemOutput, ensure_local_model, separate_to_stems
 
 console = Console()
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac"}
@@ -113,6 +113,7 @@ def _render_stems(stems: list[StemOutput], elapsed: float, track_dir: Path) -> N
 @click.option("--overlap", type=click.FloatRange(0.05, 0.9), default=0.25, show_default=True, help="Segment overlap ratio.")
 @click.option("-d", "--device", type=click.Choice(["auto", "cpu", "cuda"], case_sensitive=False), default="auto", show_default=True, help="Compute device.")
 @click.option("-t", "--threads", "--jobs", "jobs", type=int, default=0, show_default=True, help="CPU worker threads (0 = auto).")
+@click.option("--download-models", is_flag=True, help="Pre-download local weights for models into ./models for 100% offline use.")
 def cli(
     input_path: Path | None,
     output_dir: Path,
@@ -128,8 +129,9 @@ def cli(
     overlap: float,
     device: str,
     jobs: int,
+    download_models: bool,
 ) -> None:
-    """Analyze audio tracks (BPM, Key, Loudness) and split into 320 kbps MP3 stems.
+    """Analyze audio tracks (BPM, Key, Loudness) and split into 320 kbps MP3 stems (100% Local).
 
     Quick Examples:
 
@@ -141,6 +143,13 @@ def cli(
       stems song.mp3 -q          # Highest-quality fine-tuned model
       stems                      # Interactive prompt / current folder picker
     """
+    if download_models:
+        for m in ("htdemucs", "htdemucs_6s", "htdemucs_ft"):
+            with console.status(f"[bold cyan]Caching local weights for '{m}' into {MODELS_DIR}...[/bold cyan]"):
+                files = ensure_local_model(m)
+            console.print(f"[green]✓[/green] {m}: {len(files)} weight file(s) ready in [bold]{MODELS_DIR}[/bold]")
+        return
+
     target = _resolve_input_path(input_path)
     files = _collect_audio_files(target)
     if not files:
@@ -158,7 +167,12 @@ def cli(
     resolved_device = None if device.lower() == "auto" else device.lower()
     mp3_bitrate = int(bitrate)
 
-    console.print(Panel.fit(f"[bold cyan]Stem Splitter[/bold cyan] • {model_name} • {mp3_bitrate} kbps CBR MP3", border_style="cyan"))
+    console.print(
+        Panel.fit(
+            f"[bold cyan]Stem Splitter[/bold cyan] • {model_name} (Local Offline Weights) • {mp3_bitrate} kbps CBR MP3",
+            border_style="cyan",
+        )
+    )
 
     for idx, audio_file in enumerate(files, 1):
         if len(files) > 1:

@@ -1,26 +1,35 @@
-"""Demucs v4 stem separation and highest-quality MP3 encoding with ID3 metadata tagging."""
+"""Demucs v4 local-first stem separation and highest-quality MP3 encoding with ID3 metadata tagging."""
 
 from __future__ import annotations
 
 import os
+import shutil
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Literal
 
-os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
-warnings.filterwarnings("ignore", category=UserWarning, module="huggingface_hub")
-
 import torch
+import yaml
 from demucs.api import Separator, save_audio
+from demucs.apply import BagOfModels
+from demucs.hf import DEFAULT_NAMESPACE, hf_repo_name, load_safetensors_model
+from demucs.pretrained import REMOTE_ROOT
 from mutagen.id3 import ID3, TALB, TBPM, TCON, TIT2, TKEY, TPE1
 
 from .analyzer import TrackAnalysis
 
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+warnings.filterwarnings("ignore", category=UserWarning, module="huggingface_hub")
+
+# Local models folder inside the repository (100% offline execution once populated)
+MODELS_DIR = Path(__file__).resolve().parents[2] / "models"
+
 SUPPORTED_MODELS: dict[str, str] = {
     "htdemucs": "Hybrid Transformer Demucs v4 (4 stems: vocals, drums, bass, other)",
-    "htdemucs_ft": "Fine-tuned Hybrid Transformer Demucs v4 (4 stems, 4x slower, highest SDR)",
     "htdemucs_6s": "Hybrid Transformer Demucs v4 6-stem (vocals, drums, bass, guitar, piano, other)",
+    "htdemucs_ft": "Fine-tuned Hybrid Transformer Demucs v4 (4 stems, 4x slower, highest SDR)",
     "mdx_extra": "MDX-Net Extra (4 stems, strong vocal/instrumental isolation)",
 }
 
@@ -32,6 +41,58 @@ class StemOutput:
     stem_name: str
     file_path: Path
     file_size_mb: float
+
+
+def ensure_local_model(model_name: str, models_dir: Path = MODELS_DIR) -> list[Path]:
+    """Ensure all safetensors weights for `model_name` exist in local `models_dir`.
+
+    Only downloads missing `.safetensors` files once into `models_dir`; if files are
+    already in `models_dir`, zero network calls are made.
+    """
+    models_dir.mkdir(parents=True, exist_ok=True)
+    yaml_src = REMOTE_ROOT / f"{model_name}.yaml"
+    if not yaml_src.exists():
+        raise ValueError(f"Unknown Demucs model configuration: {model_name}")
+
+    yaml_dst = models_dir / f"{model_name}.yaml"
+    if not yaml_dst.exists():
+        shutil.copy2(yaml_src, yaml_dst)
+
+    bag_cfg = yaml.safe_load(yaml_dst.read_text(encoding="utf-8"))
+    signatures: list[str] = bag_cfg["models"]
+    weight_paths: list[Path] = []
+
+    for sig in signatures:
+        local_file = models_dir / f"{sig}.safetensors"
+        if not local_file.exists():
+            # One-time fetch into local models/ directory
+            from huggingface_hub import hf_hub_download
+
+            repo_id = f"{DEFAULT_NAMESPACE}/{hf_repo_name(model_name)}"
+            cached_path = Path(hf_hub_download(repo_id, f"{sig}.safetensors"))
+            shutil.copy2(cached_path, local_file)
+        weight_paths.append(local_file)
+
+    return weight_paths
+
+
+def load_local_bag(model_name: str, models_dir: Path = MODELS_DIR) -> BagOfModels:
+    """Load a Demucs `BagOfModels` directly from local `.safetensors` files on disk (zero network)."""
+    ensure_local_model(model_name, models_dir)
+    bag_cfg = yaml.safe_load((models_dir / f"{model_name}.yaml").read_text(encoding="utf-8"))
+    submodels = [load_safetensors_model(models_dir / f"{sig}.safetensors") for sig in bag_cfg["models"]]
+    bag = BagOfModels(submodels, bag_cfg.get("weights"), bag_cfg.get("segment"))
+    bag.eval()
+    return bag
+
+
+class LocalSeparator(Separator):
+    """Subclass of `demucs.api.Separator` that loads models strictly from local disk (`models/`)."""
+
+    def _load_model(self) -> None:
+        self._model = load_local_bag(self._name)
+        self._audio_channels = self._model.audio_channels
+        self._samplerate = self._model.samplerate
 
 
 def _tag_stem_mp3(mp3_path: Path, stem_name: str, analysis: TrackAnalysis | None) -> None:
@@ -78,13 +139,13 @@ def separate_to_stems(
     analysis: TrackAnalysis | None = None,
     progress_callback: Callable[[dict], None] | None = None,
 ) -> list[StemOutput]:
-    """Separate an audio track into highest-quality MP3 stems using Demucs v4."""
+    """Separate an audio track into highest-quality MP3 stems using local Demucs v4 weights."""
     audio_path = audio_path.resolve()
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     if jobs <= 0:
         jobs = max(1, (os.cpu_count() or 4) // 2) if device == "cpu" else 0
 
-    separator = Separator(
+    separator = LocalSeparator(
         model=model_name,
         device=device,
         shifts=shifts,

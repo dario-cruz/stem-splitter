@@ -9,6 +9,10 @@ wheels/
 # Virtual environments
 .venv
 
+# Local neural network weight binaries (>80MB each)
+models/*.safetensors
+models/*.th
+
 # Output and test audio files
 output/
 test_out/
