@@ -101,9 +101,10 @@ def _render_stems(stems: list[StemOutput], elapsed: float, track_dir: Path) -> N
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.argument("input_path", required=False, type=click.Path(exists=True, path_type=Path))
 @click.option("-o", "--output-dir", type=click.Path(path_type=Path), default=Path("output"), show_default=True, help="Output folder for stems.")
+@click.option("-4", "--four-stems", "--all-stems", "four_stems", is_flag=True, help="Split into 4 stems (vocals, drums, bass, other).")
 @click.option("-6", "--six-stems", is_flag=True, help="Split into 6 stems (vocals, drums, bass, guitar, piano, other).")
-@click.option("-v", "--vocals", is_flag=True, help="Split only into vocals.mp3 + no_vocals.mp3 (acapella & instrumental).")
-@click.option("-s", "--stem", "--two-stems", "two_stems", type=click.Choice(STEM_CHOICES, case_sensitive=False), help="Isolate a single <stem>.mp3 + no_<stem>.mp3.")
+@click.option("-v", "--vocals", is_flag=True, help="Split into vocals.mp3 + instrumental.mp3 (Default behavior).")
+@click.option("-s", "--stem", "--two-stems", "two_stems", type=click.Choice(STEM_CHOICES, case_sensitive=False), help="Isolate a single <stem>.mp3 + accompaniment.")
 @click.option("-q", "--hq", is_flag=True, help="Use fine-tuned model (htdemucs_ft) for maximum separation quality.")
 @click.option("-a", "--analyze", "--analyze-only", "analyze_only", is_flag=True, help="Analyze BPM, Key, and Loudness only (skip stem split).")
 @click.option("-j", "--json", "--save-json", "save_json", is_flag=True, help="Save analysis.json alongside the stems.")
@@ -117,6 +118,7 @@ def _render_stems(stems: list[StemOutput], elapsed: float, track_dir: Path) -> N
 def cli(
     input_path: Path | None,
     output_dir: Path,
+    four_stems: bool,
     six_stems: bool,
     vocals: bool,
     two_stems: str | None,
@@ -133,12 +135,15 @@ def cli(
 ) -> None:
     """Analyze audio tracks (BPM, Key, Loudness) and split into 320 kbps MP3 stems (100% Local).
 
+    By default, separates the track into 2 files: vocals.mp3 and instrumental.mp3.
+
     Quick Examples:
 
     \b
-      stems song.mp3             # 4 stems (vocals, drums, bass, other)
-      stems song.mp3 -6          # 6 stems (+ guitar, piano)
-      stems song.mp3 -v          # Vocals + Instrumental only
+      stems song.mp3             # Default: 2 tracks (vocals.mp3 + instrumental.mp3)
+      stems song.mp3 -4          # 4 stems (vocals, drums, bass, other)
+      stems song.mp3 -6          # 6 stems (vocals, drums, bass, guitar, piano, other)
+      stems song.mp3 -s drums    # Isolate drums (drums.mp3 + no_drums.mp3)
       stems song.mp3 -a          # Analyze BPM, Key & Loudness only
       stems song.mp3 -q          # Highest-quality fine-tuned model
       stems                      # Interactive prompt / current folder picker
@@ -161,15 +166,25 @@ def cli(
     elif hq:
         model_name = "htdemucs_ft"
 
-    if vocals and not two_stems:
-        two_stems = "vocals"
+    # Default to 2-stem vocal/instrumental separation unless -4 or -6 is passed
+    if two_stems:
+        target_two_stems: str | None = two_stems
+    elif vocals or not (four_stems or six_stems):
+        target_two_stems = "vocals"
+    else:
+        target_two_stems = None
 
+    mode_label = (
+        f"2 Stems ({target_two_stems} + {'instrumental' if target_two_stems == 'vocals' else 'no_' + target_two_stems})"
+        if target_two_stems
+        else ("6 Stems" if model_name == "htdemucs_6s" else "4 Stems")
+    )
     resolved_device = None if device.lower() == "auto" else device.lower()
     mp3_bitrate = int(bitrate)
 
     console.print(
         Panel.fit(
-            f"[bold cyan]Stem Splitter[/bold cyan] | {model_name} (Local Offline Weights) | {mp3_bitrate} kbps CBR MP3",
+            f"[bold cyan]Stem Splitter[/bold cyan] | {mode_label} | {model_name} (Local Offline) | {mp3_bitrate} kbps CBR MP3",
             border_style="cyan",
         )
     )
@@ -213,7 +228,7 @@ def cli(
                     model_name=model_name,
                     shifts=shifts,
                     overlap=overlap,
-                    two_stems=two_stems,
+                    two_stems=target_two_stems,
                     mp3_bitrate=mp3_bitrate,
                     device=resolved_device,
                     jobs=jobs,

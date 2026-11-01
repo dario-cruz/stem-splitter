@@ -2,7 +2,7 @@
 
 A **100% local, offline-capable** open-source CLI tool that analyzes MP3/audio tracks (technical metrics, loudness, BPM, and musical key + Camelot notation) and separates them into highest-quality **320 kbps CBR MP3 stems** using **Meta's Demucs v4 (`htdemucs`)** and **LAME (`preset=2`)**.
 
-> **Privacy & Offline Guarantee:** All audio analysis (`librosa`) and neural network stem separation (`PyTorch` + `Demucs v4`) execute **100% locally on your hardware**. Pre-trained `.safetensors` neural network weights are stored directly inside the local `models/` folder and loaded from disk without contacting any external server or requiring any API tokens.
+> **Default Behavior:** Running `stems song.mp3` automatically separates the track into **2 MP3 files**: **`vocals.mp3`** (acapella) and **`instrumental.mp3`** (the rest of the track). You can pass `-4` for 4 stems, `-6` for 6 stems, or `-s <stem>` to isolate any specific instrument.
 
 ---
 
@@ -45,17 +45,17 @@ chmod +x install.sh
 Both `stems` (short command) and `stem-splitter` are installed and can be used interchangeably from any folder:
 
 ```powershell
-# 1. Split a track into 4 stems (vocals, drums, bass, other) at 320 kbps MP3
+# 1. Default: Split into 2 tracks (vocals.mp3 + instrumental.mp3) at 320 kbps MP3
 stems song.mp3
 
 # 2. Interactive mode (auto-detects MP3s in current folder or prompts for path/drag-and-drop)
 stems
 
-# 3. Split into 6 stems (+ guitar, piano)
-stems song.mp3 -6
+# 3. Split into 4 stems (vocals.mp3, drums.mp3, bass.mp3, other.mp3)
+stems song.mp3 -4
 
-# 4. Split into Vocals + Instrumental only (vocals.mp3 + no_vocals.mp3)
-stems song.mp3 -v
+# 4. Split into 6 stems (vocals, drums, bass, guitar, piano, other)
+stems song.mp3 -6
 
 # 5. Isolate any single stem + accompaniment (e.g., drums.mp3 + no_drums.mp3)
 stems song.mp3 -s drums
@@ -75,7 +75,7 @@ stems .\my_tracks -o .\stems_out
 ## Local Model Weights (`./models`)
 
 Neural network weight files live directly in `./models/` (or `~/.stem-splitter/models` if installed outside a repo checkout):
-- `htdemucs.yaml` + `955717e8.safetensors` (~80 MB — Default 4-stem model)
+- `htdemucs.yaml` + `955717e8.safetensors` (~80 MB — Default model)
 - `htdemucs_6s.yaml` + `5c90dfd2.safetensors` (~52 MB — 6-stem model adding Guitar & Piano)
 
 When `stems` runs, `LocalSeparator` loads `.safetensors` directly from `./models/` with zero HTTP requests.
@@ -86,10 +86,11 @@ When `stems` runs, `LocalSeparator` loads `.safetensors` directly from `./models
 
 | Short | Long | Description |
 | :--- | :--- | :--- |
-| *(none)* | `[INPUT_PATH]` | File or folder path. Optional—if omitted, runs interactive picker. |
+| *(none)* | `[INPUT_PATH]` | File or folder path. Optional—if omitted, runs interactive picker. **Defaults to 2 tracks (`vocals.mp3` + `instrumental.mp3`).** |
+| `-4` | `--four-stems` | Split into 4 stems (`vocals`, `drums`, `bass`, `other`). |
 | `-6` | `--six-stems` | Split into 6 stems (`vocals`, `drums`, `bass`, `guitar`, `piano`, `other`). |
-| `-v` | `--vocals` | Split only into `vocals.mp3` + `no_vocals.mp3` (acapella & instrumental). |
-| `-s` | `--stem <name>` | Isolate any single `<stem>.mp3` + `no_<stem>.mp3`. |
+| `-v` | `--vocals` | Explicit flag for the default 2-track split (`vocals.mp3` + `instrumental.mp3`). |
+| `-s` | `--stem <name>` | Isolate any single `<stem>.mp3` + accompaniment (`no_<stem>.mp3`). |
 | `-q` | `--hq` | Use fine-tuned `htdemucs_ft` model for maximum quality. |
 | `-a` | `--analyze` | Only run BPM, Key, and Loudness analysis (skip stem separation). |
 | `-j` | `--json` | Save `analysis.json` alongside the separated stems. |

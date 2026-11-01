@@ -135,7 +135,7 @@ def separate_to_stems(
     model_name: str = "htdemucs",
     shifts: int = 1,
     overlap: float = 0.25,
-    two_stems: str | None = None,
+    two_stems: str | None = "vocals",
     mp3_bitrate: int = 320,
     mp3_preset: Literal[2, 3, 4, 5, 6, 7] = 2,
     clip_mode: Literal["rescale", "clamp", "tanh", "none"] = "rescale",
@@ -187,4 +187,5 @@ def separate_to_stems(
 
     target_tensor = stems_dict.pop(two_stems)
     residual_sum = torch.stack(list(stems_dict.values())).sum(dim=0)
-    return [_export(two_stems, target_tensor), _export(f"no_{two_stems}", residual_sum)]
+    second_name = "instrumental" if two_stems == "vocals" else f"no_{two_stems}"
+    return [_export(two_stems, target_tensor), _export(second_name, residual_sum)]
